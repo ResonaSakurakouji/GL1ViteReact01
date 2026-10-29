@@ -64,6 +64,7 @@ const check = (name, cond, extra = '') => {
 const panelOpen = () => q('.panel')?.dataset.open === 'true'
 const boardOn = () => q('.dash')?.dataset.active === 'true'
 const wheelOut = () => q('.wheel')?.hasAttribute('inert') === true
+const headerOn = () => q('.cmd-header')?.dataset.on === 'true'
 const labels = () => qa('.panel-row .row-label').map((n) => n.textContent)
 const crumbs = () => qa('.topbar-crumbs li').map((n) => n.textContent)
 const levelName = () => q('.panel-name-text')?.textContent ?? ''
@@ -165,8 +166,12 @@ await at(90)
 check('t≈90  看板已在撤', boardOn() === false)
 check('t≈90  面板已在撤（不等看板）', panelOpen() === false)
 check('t≈90  指令盘尚未回来', wheelOut() === true)
+check('t≈90  被选中按钮仍锚在左上角', q('.cmd-btn.is-picked') !== null)
+check('t≈90  标题仍在（等面板撤完再交接）', headerOn() === true)
 await at(320)
 check('t≈320  指令盘开始回位', wheelOut() === false)
+check('t≈320  按钮已离开锚点（直接飞回槽位）', q('.cmd-btn.is-picked') === null)
+check('t≈320  标题已交给按钮', headerOn() === false)
 await at(900)
 check('t≈900  停在 menu 而不是空屏', q('.stage')?.dataset.stage === 'menu', `got ${q('.stage')?.dataset.stage}`)
 check('面板内容已清空', qa('.panel-row').length === 0, `got ${qa('.panel-row').length}`)

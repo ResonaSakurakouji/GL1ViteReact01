@@ -235,8 +235,11 @@ export function reducer(state: UiState, action: UiAction): UiState {
 
     /**
      * 回主页面 = 指令盘。
-     * 面板 / 看板 / 色带同刻撤离（都用 dur-panel），撤完再把指令盘飞回来，
-     * 所以面板不会在滑出去的过程中变空壳。
+     * 面板 / 看板 / 色带同刻撤离（都用 dur-panel）。
+     *
+     * 关键：anchor 不能在 t=0 就放开。否则被选中的那枚会先按"收起位"
+     * 飞到屏幕外，等 wheel 打开再飞回来——也就是"先飞出去再飞回来"。
+     * 放在 256ms 这一拍和 wheel 同时翻，它才会从左上角一步飞回自己的槽位。
      */
     case 'HOME': {
       if (state.stage === 'idle') return state
@@ -247,16 +250,18 @@ export function reducer(state: UiState, action: UiAction): UiState {
           board: false,
           chrome: false,
           wheel: false,
-          anchor: false,
           leaf: null,
           drilling: null,
           listPhase: 'idle',
         },
         T.homeToMenu,
         [
+          // 面板撤走之后，指令盘才回来；此时放开锚点，按钮直接飞回最终位置
+          { at: MOTION.durPanel, patch: { wheel: true, anchor: false } },
+          // 等左上角标题淡出（128ms）后再清内容，避免它变成一条空的灰条
           {
-            at: MOTION.durPanel,
-            patch: { wheel: true, pickedMenu: null, path: [], collapsed: false },
+            at: MOTION.durPanel + MOTION.durFast,
+            patch: { pickedMenu: null, path: [], collapsed: false },
           },
         ],
       )
