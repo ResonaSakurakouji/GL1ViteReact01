@@ -63,7 +63,7 @@ const check = (name, cond, extra = '') => {
 
 const panelOpen = () => q('.panel')?.dataset.open === 'true'
 const boardOn = () => q('.dash')?.dataset.active === 'true'
-const wheelOut = () => q('.wheel')?.getAttribute('aria-hidden') === 'true'
+const wheelOut = () => q('.wheel')?.hasAttribute('inert') === true
 const labels = () => qa('.panel-row .row-label').map((n) => n.textContent)
 const crumbs = () => qa('.topbar-crumbs li').map((n) => n.textContent)
 const levelName = () => q('.panel-name-text')?.textContent ?? ''
@@ -84,6 +84,23 @@ await click(btn)
 await settle(1100)
 check('进入 panel', q('.stage')?.dataset.stage === 'panel')
 check('一层 6 项', labels().length === 6, `got ${labels().length}`)
+
+console.log('\n=== 1b. 图表用 ECharts 挂载 ===')
+check('三块图表容器', qa('.chart-body').length === 3, `got ${qa('.chart-body').length}`)
+check('存在 Canvas 宿主节点', qa('.chart-canvas').length === 3, `got ${qa('.chart-canvas').length}`)
+check('宿主带无障碍标签', Boolean(q('.chart-canvas')?.getAttribute('aria-label')))
+check(
+  '无 Canvas 的测试环境显示降级文案',
+  qa('.chart-fallback').length === 3,
+  `got ${qa('.chart-fallback').length}`,
+)
+check('排行也换成图表卡', q('.ranks-card .chart-body') !== null)
+check('旧的自绘柱状已移除', q('.bars') === null && q('.trend') === null)
+
+console.log('\n=== 1c. 隐藏容器用 inert，不用 aria-hidden ===')
+check('指令盘关闭时带 inert', wheelOut() === true)
+check('指令盘不再有 aria-hidden', q('.wheel')?.hasAttribute('aria-hidden') === false)
+check('面板打开时没有 inert', q('.panel')?.hasAttribute('inert') === false)
 
 console.log('\n=== 2. 头部拆成两半：左箭头 + 层级名 ===')
 check('左箭头存在', q('.panel-back') !== null)
@@ -155,6 +172,8 @@ check('t≈900  停在 menu 而不是空屏', q('.stage')?.dataset.stage === 'me
 check('面板内容已清空', qa('.panel-row').length === 0, `got ${qa('.panel-row').length}`)
 check('面包屑已清空', qa('.topbar-crumbs li').length === 0)
 check('9 个按钮都在位', qa('.cmd-btn').length === 9)
+check('面板关闭后为 inert', q('.panel')?.hasAttribute('inert') === true)
+check('面板不再有 aria-hidden', q('.panel')?.hasAttribute('aria-hidden') === false)
 
 console.log('\n=== 9. 深链直达深层 + 叶子 ===')
 await act(async () => {

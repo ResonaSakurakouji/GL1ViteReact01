@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { CSSProperties, Dispatch } from 'react'
 import {
   BTN_W_VW,
@@ -25,9 +26,23 @@ interface Props {
  */
 export function CommandWheel({ state, dispatch }: Props) {
   const open = state.wheel
+  const hostRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * 关闭时把焦点从盘内移走。
+   * 容器上如果同时有"焦点"和"aria-hidden / inert"，浏览器会拒绝隐藏它并报警告；
+   * inert 本身会让浏览器把焦点弹到 body，这里再加一层保险（旧引擎不一定实现）。
+   */
+  useEffect(() => {
+    if (open) return
+    const host = hostRef.current
+    const active = document.activeElement
+    if (host && active instanceof HTMLElement && host.contains(active)) active.blur()
+  }, [open])
 
   return (
-    <div className="wheel" aria-hidden={!open}>
+    // 用 inert 而不是 aria-hidden：它同时移出无障碍树、禁止聚焦和点击
+    <div className="wheel" ref={hostRef} inert={!open}>
       {NAV.map((item) => {
         // anchor 一旦落下就钉在左上角，直到 beats 在 256ms 后把它放回来
         const picked = state.anchor && state.pickedMenu === item.key

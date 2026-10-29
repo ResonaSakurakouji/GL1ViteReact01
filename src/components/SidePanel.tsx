@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { CSSProperties, Dispatch, KeyboardEvent } from 'react'
 import { NAV_BY_KEY, levelNodes, resolvePath } from '../data/menu.config'
 import type { UiAction, UiState } from '../state/machine'
@@ -42,14 +43,25 @@ export function SidePanel({ state, dispatch }: Props) {
     if (open) dispatch({ type: 'POP' })
   }
 
+  const hostRef = useRef<HTMLElement>(null)
+
+  /** 面板收起时把焦点移出去，避免"焦点留在 aria-hidden/inert 容器里"的告警 */
+  useEffect(() => {
+    if (open) return
+    const host = hostRef.current
+    const active = document.activeElement
+    if (host && active instanceof HTMLElement && host.contains(active)) active.blur()
+  }, [open])
+
   return (
     <aside
       className="panel"
+      ref={hostRef}
       data-open={open}
       data-collapsed={state.collapsed}
       data-phase={state.listPhase}
       data-dir={state.listDir}
-      aria-hidden={!open}
+      inert={!open}
       aria-label="维度导航"
     >
       <div className="panel-head">

@@ -94,6 +94,22 @@ npm run smoke    # SSR 渲染 + reducer 冒烟
 - 有下级的项右侧带 `›`，一眼能看出还能往下钻。
 - 面包屑放在 TopBar 而不是面板里，是为了不占面板的固定高度，也不会被滚动列表挤走。
 
+## 可访问性
+
+隐藏的容器一律用 `inert` 而不是 `aria-hidden`：
+
+```tsx
+<div className="wheel" inert={!open}>   {/* 不是 aria-hidden={!open} */}
+```
+
+原因：`aria-hidden` 只是"从无障碍树里移除"，**不阻止聚焦**。当用户点了某个按钮、焦点还留在里面，
+容器却被标成 `aria-hidden` 时，浏览器会拒绝隐藏并抛警告：
+
+> Blocked aria-hidden on an element because its descendant retained focus.
+
+`inert` 同时做三件事：移出无障碍树、禁止聚焦、禁止点击，正是这里要的。
+另外两个容器（`.wheel` / `.panel`）在收起时还会主动把焦点 blur 掉，作为旧引擎的兜底。
+
 ## 目录
 
 ```
@@ -108,10 +124,14 @@ src/
   components/
     CommandWheel.tsx       九宫指令按钮
     CmdHeader.tsx          左上角标题（原 #btn_LT_b）
-    SidePanel.tsx          多级导航面板（面包屑 + 滚动列表 + 收起把手）
-    TopBar.tsx             顶部色带（原 #t0Bar）
+    SidePanel.tsx          多级导航面板（返回条 + 滚动列表 + 收起把手）
+    TopBar.tsx             顶部色带 + 面包屑
     Backdrop.tsx           遮罩（原 #battleMenuS）
-    Dashboard.tsx          KPI / 柱状 / 折线 / 排行
+    Dashboard.tsx          KPI + 三块 ECharts 图表
+  charts/
+    echarts.ts             按需注册（柱/折线 + 直角坐标系 + Canvas 渲染器）
+    Chart.tsx              ECharts 生命周期封装（init / setOption / resize / dispose）
+    options.ts             三张图的 option 构造函数
   styles/app.css           全部样式
 scripts/
   uitest.mjs               jsdom 交互测试（npm test）
@@ -129,6 +149,25 @@ scripts/
 现在改成 **就位标志 + 定时节拍**：`wheel` / `anchor` / `chrome` / `board` 四个布尔
 只表示"现在该在目标位还是起始位"，由 `beats` 在正确时刻翻。CSS 里只剩下每个
 元素自己的 `--delay`（波浪错峰），那是局部的、不会被误改。
+
+## 图表
+
+三块图都用 ECharts 6，按需注册（`echarts/core` + `BarChart`/`LineChart` + `Grid`/`Tooltip` + `CanvasRenderer`），
+不引全量包——老目录里的 `echarts.common.js` 是 2.2MB，按需引入后 ECharts 部分 516KB（gzip 175KB）。
+
+- **生命周期**：`Chart.tsx` 里两条 effect 分工——挂载时 `init` + 挂 `ResizeObserver`，
+  卸载 `dispose`；数据变化只 `setOption(option, true)`，不重建实例（重建会丢动画、漏 canvas）。
+- **画布尺寸**：`.chart-canvas` 绝对定位铺满 `.chart-body`，尺寸只由父级决定，
+  避免"canvas 尺寸 → 反馈布局 → 再触发 resize"的循环。
+- **降级**：没有 Canvas 的环境（服务端、jsdom）不 init，直接渲染一行提示，
+  不会把整棵树带崩——这也是 `npm test` 能跑通的原因。
+- **分包**：`vite.config.ts` 里把 `echarts`/`zrender` 单独成块，业务代码改动不会让它重新下载。
+
+| 卡片 | 图表 |
+|---|---|
+| 月度销量分布 | 柱状，渐变 + 圆角，12 个月 |
+| 近 24 小时订单趋势 | 平滑折线 + 面积渐变 |
+| 区县贡献 Top 5 | 横向条，右端带数值标签 |
 
 ## 与原实现的对应关系
 

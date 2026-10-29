@@ -755,6 +755,14 @@ button:disabled {
   gap: 1vh;
 }
 
+.chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1vw;
+  flex: 0 0 auto;
+}
+
 .chart-head h2 {
   margin: 0;
   font-size: clamp(9px, 1.4vh, 14px);
@@ -766,141 +774,37 @@ button:disabled {
 .chart-unit {
   font-size: clamp(8px, 1.1vh, 11px);
   color: var(--text-dim);
-  align-self: flex-start;
+  white-space: nowrap;
 }
 
-/* 柱状 */
-
-.bars {
+/* ECharts 画布：绝对定位铺满父级，尺寸只由父级决定，
+   否则 canvas 自身尺寸反馈给布局会造成 resize 死循环 */
+.chart-body {
   position: relative;
   flex: 1;
   min-height: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 0.45vw;
 }
 
-.bar {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
+.chart-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.chart-fallback {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.5vh;
-}
-
-.bar-value {
-  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
-  font-size: clamp(7px, 1.05vh, 11px);
-  color: var(--text-dim);
-  line-height: 1;
-}
-
-.bar-track {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  display: flex;
-  align-items: flex-end;
   justify-content: center;
-}
-
-.bar-fill {
-  width: 58%;
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(to top, rgba(198, 146, 106, 0.28), var(--gold-hi));
-  transition: height var(--dur-panel) var(--ease-out);
-}
-
-.bar-label {
-  font-size: clamp(7px, 1.05vh, 11px);
-  color: var(--text-dim);
-  line-height: 1;
-  white-space: nowrap;
-}
-
-/* 折线 */
-
-.trend {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6vh;
-}
-
-.trend svg {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  overflow: visible;
-}
-
-.trend-axis {
-  display: flex;
-  justify-content: space-between;
-  font-size: clamp(7px, 1.05vh, 11px);
+  font-size: clamp(9px, 1.3vh, 13px);
+  letter-spacing: 0.1em;
   color: var(--text-dim);
 }
 
-/* 排行 */
-
+/* 排行卡片定高，横向条才有稳定的画布 */
 .ranks-card {
-  flex: 0 0 auto;
-}
-
-.ranks {
-  display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 0.7vh;
-}
-
-.rank {
-  display: grid;
-  grid-template-columns: 2vw 8vw 1fr 6vw;
-  align-items: center;
-  gap: 0.8vw;
-}
-
-.rank-no {
-  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
-  font-size: clamp(8px, 1.15vh, 12px);
-  color: var(--gold-hi);
-  opacity: 0.6;
-}
-
-.rank-label {
-  font-size: clamp(9px, 1.35vh, 13px);
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.rank-track {
-  height: 0.7vh;
-  background: rgba(236, 192, 107, 0.1);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.rank-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(to right, var(--gold-b), var(--gold-hi));
-  transition: width var(--dur-panel) var(--ease-out);
-}
-
-.rank-value {
-  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
-  font-size: clamp(8px, 1.2vh, 12px);
-  color: var(--text-hi);
-  text-align: right;
-}
-
-/* ---------- 提示层 ---------- */
+  flex: 0 0 21vh;
+}/* ---------- 提示层 ---------- */
 
 .hint {
   transition: opacity var(--dur-panel) var(--ease-io);

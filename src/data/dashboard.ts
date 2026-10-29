@@ -14,8 +14,7 @@ export interface BarDatum {
 
 export interface RankDatum {
   label: string
-  value: string
-  pct: number
+  value: number
 }
 
 export interface DashView {
@@ -25,7 +24,7 @@ export interface DashView {
   kpis: Kpi[]
   bars: { title: string; unit: string; items: BarDatum[] }
   trend: { title: string; unit: string; points: number[] }
-  ranks: { title: string; items: RankDatum[] }
+  ranks: { title: string; unit: string; items: RankDatum[] }
 }
 
 /** 确定性伪随机：同一个 key 永远得到同一组数字，避免每次渲染数据跳动 */
@@ -108,8 +107,7 @@ export function buildView(menuKey: string | null, path: string[] = [], leaf: str
     .slice(0, 5)
     .map((r, i) => ({
       label: r.label,
-      value: `${(base * r.v * (5 - i * 0.35)).toFixed(1)} 万`,
-      pct: Math.round((r.v / 1.35) * 100),
+      value: +(base * r.v * (5 - i * 0.35)).toFixed(1),
     }))
 
   return {
@@ -119,6 +117,6 @@ export function buildView(menuKey: string | null, path: string[] = [], leaf: str
     kpis,
     bars: { title: '月度销量分布', unit: '万件', items: bars },
     trend: { title: '近 24 小时订单趋势', unit: '单', points },
-    ranks: { title: '区县贡献 Top 5', items: ranks },
+    ranks: { title: '区县贡献 Top 5', unit: '万', items: ranks },
   }
 }
