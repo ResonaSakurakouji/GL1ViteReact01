@@ -2,7 +2,7 @@
 // 用法：npm test
 import { JSDOM } from 'jsdom'
 
-const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+const dom = new JSDOM('<!doctype html><html lang="zh-CN"><body><div id="root"></div></body></html>', {
   url: 'http://localhost/',
   pretendToBeVisual: true,
 })
@@ -184,7 +184,7 @@ console.log('\n=== 9. 深链直达深层 + 叶子 ===')
 await act(async () => {
   root.unmount()
 })
-const deep = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+const deep = new JSDOM('<!doctype html><html lang="zh-CN"><body><div id="root"></div></body></html>', {
   url: 'http://localhost/?stage=row&menu=channel&path=dealer&leaf=l1',
   pretendToBeVisual: true,
 })

@@ -193,8 +193,11 @@ scripts/
 
 ## 换背景
 
-`src/styles/app.css` 顶部：
+改 `src/styles/app.css` 里的 `--bg-image` 变量，图片放在 `public/bg/`：
 
-```css
---bg-image: url('/bg/miku087.jpg');  /* 备选 /bg/Nipponpaint.jpg */
-```
+| 值 | 说明 |
+|---|---|
+| `/bg/miku087.jpg` | 默认 |
+| `/bg/Nipponpaint.jpg` | 备选 |
+
+`public/` 下的文件由 Vite 原样搬到 `dist/`，换图不需要动构建配置。

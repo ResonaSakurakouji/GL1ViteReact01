@@ -5,7 +5,26 @@
 
 :root {
   --bg: #08090a;
+
+  /* Vite 的 public 目录：/bg 指 public/bg，运行时才映射，静态检查解析不了，
+     按 JetBrains 的机制忽略这一条 */
+  /*noinspection CssUnknownTarget*/
   --bg-image: url('/bg/miku087.jpg');
+
+  /* 时序令牌的真实来源是 src/data/motion.ts，启动时由 installMotionVars() 覆盖到
+     documentElement（内联样式优先级高于这里）。在 :root 再写一遍是为了：
+       ① IDE / 静态检查能解析，否则满屏 "无法解析自定义属性"；
+       ② JS 执行前的首帧也有正确时长。
+     改时序请改 motion.ts —— npm run smoke 会校验两边是否一致。 */
+  --dur-fast: 128ms;
+  --dur-row: 192ms;
+  --dur-panel: 256ms;
+  --dur-main: 384ms;
+  --stagger: 96ms;
+
+  /* 逐元素覆盖的变量（--delay 由 React 内联写、--i 是行序号），给个默认值便于解析 */
+  --delay: 0ms;
+  --i: 0;
 
   --gold-a: #c6926a;
   --gold-b: #8a5a35;

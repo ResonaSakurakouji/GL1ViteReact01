@@ -1,5 +1,6 @@
 // SSR 烟测：四个状态各渲染一次，并跑一遍 reducer（含节拍）。
 // 用法：npm run smoke
+import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
@@ -88,5 +89,24 @@ const deepLink = makeInitialState('?stage=row&menu=region&path=sh,pudong&leaf=pu
 console.log('深链         ->', deepLink.stage, 'path', JSON.stringify(deepLink.path), 'leaf', deepLink.leaf)
 console.log('MAX_DEPTH    ->', MAX_DEPTH)
 
-console.log('\nOK')
+/**
+ * app.css 的 :root 里为 IDE 解析保留了一份时长兜底值，
+ * 真实来源是 motion.ts。这里校验两边没跑偏，避免"改了 TS 忘了 CSS"。
+ */
+const { MOTION } = await server.ssrLoadModule('/src/data/motion.ts')
+const css = readFileSync('src/styles/app.css', 'utf8')
+const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())
+
+console.log('\n--- 时序令牌一致性 ---')
+let drift = 0
+for (const [key, ms] of Object.entries(MOTION)) {
+  const name = `--${kebab(key)}`
+  const hit = css.match(new RegExp(`${name}:\\s*(\\d+)ms`))
+  const ok = Boolean(hit) && Number(hit[1]) === ms
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${name.padEnd(12)} motion=${ms}ms  css=${hit ? hit[1] + 'ms' : '(缺失)'}`)
+  if (!ok) drift++
+}
+if (drift > 0) process.exitCode = 1
+
+console.log(drift > 0 ? `\n有 ${drift} 个令牌与 motion.ts 不一致` : '\nOK')
 await server.close()

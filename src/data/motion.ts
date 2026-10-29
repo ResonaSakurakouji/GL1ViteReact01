@@ -3,6 +3,9 @@
  *
  * 原 move.js 把 384ms 同时写在 CSS(.eio384) 和 JS(sleepS * 1024) 里，
  * 改一处忘一处就会漂移。这里只保留一份数字，CSS 变量在启动时由它生成。
+ *
+ * 注意：app.css 的 :root 里也写了一份同值兜底（给 IDE 解析 + JS 执行前的首帧用）。
+ * 改这里的数字必须同步那边 —— `npm run smoke` 会校验两边是否一致。
  */
 export const MOTION = {
   durFast: 128,
