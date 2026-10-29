@@ -1,0 +1,73 @@
+import type { CSSProperties, Dispatch } from 'react'
+import {
+  BTN_W_VW,
+  CENTER_LEFT_VW,
+  LEFT_X_VW,
+  NAV,
+  closedOffset,
+  cornerOffset,
+} from '../data/menu.config'
+import { waveDelay } from '../state/choreo'
+import type { UiAction, UiState } from '../state/machine'
+
+interface Props {
+  state: UiState
+  dispatch: Dispatch<UiAction>
+}
+
+/**
+ * 九个指令按钮。原版靠 OrderEles.init() 遍历 DOM + classList 反推批次，
+ * 这里直接读配置里的 side / order / top。
+ *
+ * 位置只看 state.wheel：
+ *   wheel=true  → 全部回位
+ *   被选中那枚 → 飞到左上角（其余靠 wheel 落下来才退场，由 beats 控制时机）
+ */
+export function CommandWheel({ state, dispatch }: Props) {
+  const open = state.wheel
+
+  return (
+    <div className="wheel" aria-hidden={!open}>
+      {NAV.map((item) => {
+        // anchor 一旦落下就钉在左上角，直到 beats 在 256ms 后把它放回来
+        const picked = state.anchor && state.pickedMenu === item.key
+        const closed = closedOffset(item)
+        const corner = cornerOffset(item)
+
+        const tx = picked ? corner.x : open ? '0vw' : closed.x
+        const ty = picked ? corner.y : open ? '0vh' : closed.y
+
+        const anchor: CSSProperties =
+          item.side === 'left'
+            ? { left: `${LEFT_X_VW}vw` }
+            : item.side === 'right'
+              ? { right: `${LEFT_X_VW}vw` }
+              : { left: `${CENTER_LEFT_VW}vw` }
+
+        return (
+          <button
+            key={item.key}
+            type="button"
+            className={`cmd-btn${picked ? ' is-picked' : ''}`}
+            disabled={!open}
+            style={
+              {
+                ...anchor,
+                top: `${item.top}vh`,
+                width: `${BTN_W_VW}vw`,
+                transform: `translate(${tx}, ${ty})`,
+                // 刚被选过的那枚始终领舞：飞出去、飞回来都 0 延迟
+                '--delay': `${state.pickedMenu === item.key ? 0 : waveDelay(item.order)}ms`,
+                zIndex: picked ? 40 : undefined,
+              } as CSSProperties
+            }
+            onClick={() => dispatch({ type: 'PICK_MENU', key: item.key })}
+          >
+            <span className="cmd-label">{item.label}</span>
+            <span className="cmd-sub">{item.sub}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
