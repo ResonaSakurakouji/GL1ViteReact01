@@ -32,7 +32,7 @@ export function CmdHeader({ state, dispatch }: Props) {
       }}
     >
       <span className="cmd-header-label">{menu?.label ?? ''}</span>
-      <span className="cmd-header-hint">回到主页面</span>
+      <span className="cmd-header-hint">回到指令盘</span>
     </button>
   )
 }

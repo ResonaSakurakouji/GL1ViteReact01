@@ -1,5 +1,5 @@
 import type { CSSProperties, Dispatch, KeyboardEvent } from 'react'
-import { levelNodes } from '../data/menu.config'
+import { NAV_BY_KEY, levelNodes, resolvePath } from '../data/menu.config'
 import type { UiAction, UiState } from '../state/machine'
 
 interface Props {
@@ -17,23 +17,27 @@ const activate = (fn: () => void) => (e: KeyboardEvent) => {
 /**
  * 左侧多级导航面板。
  *
- * 结构：返回条 + 可滚动列表 + 收起把手。
- *   · 顶部返回条点击 = 回上一层（第一层时退回指令盘）
+ * 结构：头部（左箭头 + 当前层级名）+ 可滚动列表 + 收起把手。
+ *   · 左箭头：一键退层（跳过"取消叶子选中"这一步）
+ *   · 右侧层级名：与之前整条头部的行为一致，先取消叶子选中，再退层
  *   · 叶子节点只切看板，不推进层级
  *   · 面板高度固定，条目多了在 .panel-body 内部滚动
- *
- * 层级动画只由 data-phase / data-dir 驱动 CSS，行本身不认识"正在干什么"：
- *   out + drill —— 当前层滑走，被点中的那项飞向顶部
- *   in  + drill —— 下一层从右侧滑入
- *   out + pop   —— 当前层滑走，回到上一层
- *   in  + pop   —— 上一层从左侧滑回
  */
 export function SidePanel({ state, dispatch }: Props) {
+  const menu = state.pickedMenu ? NAV_BY_KEY.get(state.pickedMenu) : undefined
+  const chain = menu ? resolvePath(menu.rows, state.path) : []
   const items = state.pickedMenu ? levelNodes(state.pickedMenu, state.path) : []
+
   const open = state.chrome
   const levelKey = `${state.pickedMenu ?? ''}/${state.path.join('.')}`
-  const backText = state.path.length > 0 ? '返回上一级' : '返回指令盘'
 
+  // 当前层级的名称：第一层是主题本身，往下是所在节点
+  const levelLabel = chain.length > 0 ? chain[chain.length - 1].label : (menu?.label ?? '')
+  const backHint = state.path.length > 0 ? '返回上一级' : '返回指令盘'
+
+  const forcePop = () => {
+    if (open) dispatch({ type: 'POP', force: true })
+  }
   const pop = () => {
     if (open) dispatch({ type: 'POP' })
   }
@@ -48,17 +52,31 @@ export function SidePanel({ state, dispatch }: Props) {
       aria-hidden={!open}
       aria-label="维度导航"
     >
-      <div
-        className="panel-head"
-        role="button"
-        tabIndex={open ? 0 : -1}
-        aria-label={backText}
-        title={backText}
-        onClick={pop}
-        onKeyDown={activate(pop)}
-      >
-        <span className="panel-back-glyph">‹</span>
-        <span className="panel-back-text">{backText}</span>
+      <div className="panel-head">
+        <div
+          className="panel-back"
+          role="button"
+          tabIndex={open ? 0 : -1}
+          aria-label="返回上一级"
+          title="返回上一级"
+          onClick={forcePop}
+          onKeyDown={activate(forcePop)}
+        >
+          <span className="panel-back-glyph">‹</span>
+        </div>
+
+        <div
+          className="panel-name"
+          role="button"
+          tabIndex={open ? 0 : -1}
+          aria-label={levelLabel}
+          title={levelLabel}
+          onClick={pop}
+          onKeyDown={activate(pop)}
+        >
+          <span className="panel-name-text">{levelLabel}</span>
+          <span className="panel-name-hint">{backHint}</span>
+        </div>
       </div>
 
       <div className="panel-body">

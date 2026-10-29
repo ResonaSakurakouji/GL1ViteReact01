@@ -289,50 +289,93 @@ button:disabled {
   transform: translateX(calc(-1 * (var(--panel-w) - var(--panel-peek))));
 }
 
-/* 返回条：整个条都是热区，点击回上一层（第一层时退回指令盘） */
+/* 头部：左箭头 + 当前层级名，两半各自可点 */
 .panel-head {
   position: relative;
   z-index: 6;
   flex: 0 0 auto;
   height: var(--slot);
   display: flex;
-  align-items: center;
-  gap: 0.5vw;
-  padding: 0 var(--tab-w) 0 1.1vw;
+  align-items: stretch;
   border-bottom: 1px solid var(--line-soft);
+}
+
+/* 左侧返回箭头：视觉权重明显高于右侧，一键退层 */
+.panel-back {
+  flex: 0 0 2.4vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   outline: none;
-  background-color: transparent;
+  color: var(--gold-hi);
+  background-color: rgba(236, 192, 107, 0.08);
+  border-right: 1px solid var(--line);
   transition:
     background-color var(--dur-fast) var(--ease-io),
     color var(--dur-fast) linear;
 }
 
-.panel-head:hover {
+.panel-back:hover {
+  background-color: rgba(236, 192, 107, 0.3);
+  color: #fff3d8;
+}
+
+.panel-back:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: -2px;
+}
+
+.panel-back-glyph {
+  font-size: 3vh;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.panel-back:hover .panel-back-glyph {
+  transform: translateX(-0.25vw);
+}
+
+/* 右侧：当前层级名称，交互与原来的整条头部一致（先取消叶子选中，再退层） */
+.panel-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3vh;
+  padding: 0 var(--tab-w) 0 0.9vw;
+  cursor: pointer;
+  outline: none;
+  background-color: transparent;
+  transition: background-color var(--dur-fast) var(--ease-io);
+}
+
+.panel-name:hover {
   background-color: rgba(236, 192, 107, 0.12);
 }
 
-.panel-head:focus-visible {
+.panel-name:focus-visible {
   background-color: rgba(236, 192, 107, 0.12);
   box-shadow: inset 2px 0 0 var(--gold-hi);
 }
 
-.panel-back-glyph {
-  font-size: 2.2vh;
+.panel-name-text {
+  font-size: clamp(10px, 1.75vh, 17px);
+  font-weight: 700;
+  color: var(--text-hi);
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-name-hint {
+  font-size: clamp(8px, 1.15vh, 12px);
+  letter-spacing: 0.14em;
   color: var(--gold-hi);
-  opacity: 0.75;
-  transition: transform var(--dur-fast) var(--ease-out);
-}
-
-.panel-head:hover .panel-back-glyph {
-  transform: translateX(-0.2vw);
-}
-
-.panel-back-text {
-  font-size: clamp(9px, 1.4vh, 13px);
-  letter-spacing: 0.12em;
-  color: var(--text);
+  opacity: 0.55;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;

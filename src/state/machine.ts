@@ -70,9 +70,12 @@ export type UiAction =
   | { type: 'OPEN_MENU' }
   | { type: 'PICK_MENU'; key: string }
   | { type: 'PICK_ROW'; key: string }
-  /** 返回上一层；面板第一层时退回指令盘 */
-  | { type: 'POP' }
-  /** 回主页面：面板 / 看板 / 色带同步撤离 */
+  /**
+   * 返回上一层；面板第一层时退回指令盘。
+   * force = true 时跳过"取消叶子选中"，直接退一层（面板左侧返回箭头用）。
+   */
+  | { type: 'POP'; force?: boolean }
+  /** 回主页面 = 指令盘；面板 / 看板 / 色带同步撤离，撤完指令盘再飞回 */
   | { type: 'HOME' }
   | { type: 'TOGGLE_COLLAPSE' }
   | { type: 'BEAT'; patch: Partial<UiPatch> }
@@ -106,6 +109,8 @@ export const T = {
   rowDrill: MOTION.durRow * 2,
   /** 同步撤离：三者同刻走完 */
   home: MOTION.durPanel + 64,
+  /** 同步撤离 + 指令盘重新飞回（HOME 的完整时长） */
+  homeToMenu: MOTION.durPanel + MOTION.stagger * 3 + MOTION.durMain,
 } as const
 
 const isOpen = (s: Stage) => s === 'panel' || s === 'row'
@@ -187,8 +192,9 @@ export function reducer(state: UiState, action: UiAction): UiState {
     }
 
     case 'POP': {
-      // 叶子只是"选中"，不算一层：先取消选中，面包屑才会一层一层往回缩
-      if (state.leaf) return { ...state, leaf: null }
+      // 叶子只是"选中"，不算一层：先取消选中，面包屑才会一层一层往回缩。
+      // 左侧返回箭头走 force，跳过这一步直接退层。
+      if (!action.force && state.leaf) return { ...state, leaf: null }
       if (state.stage === 'row') {
         const next = state.path.slice(0, -1)
         return go(state, { leaf: null, listPhase: 'out', listDir: 'pop', drilling: null }, T.rowDrill, [
@@ -228,15 +234,16 @@ export function reducer(state: UiState, action: UiAction): UiState {
     }
 
     /**
-     * 回主页面：面板 / 看板 / 色带同刻撤离（都用 dur-panel），
-     * 撤完再把内容清空，避免面板滑出去的过程中变成空壳。
+     * 回主页面 = 指令盘。
+     * 面板 / 看板 / 色带同刻撤离（都用 dur-panel），撤完再把指令盘飞回来，
+     * 所以面板不会在滑出去的过程中变空壳。
      */
     case 'HOME': {
       if (state.stage === 'idle') return state
       return go(
         state,
         {
-          stage: 'idle',
+          stage: 'menu',
           board: false,
           chrome: false,
           wheel: false,
@@ -245,11 +252,11 @@ export function reducer(state: UiState, action: UiAction): UiState {
           drilling: null,
           listPhase: 'idle',
         },
-        T.home,
+        T.homeToMenu,
         [
           {
             at: MOTION.durPanel,
-            patch: { pickedMenu: null, path: [], collapsed: false },
+            patch: { wheel: true, pickedMenu: null, path: [], collapsed: false },
           },
         ],
       )
