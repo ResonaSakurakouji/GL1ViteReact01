@@ -1,5 +1,5 @@
 import { MOTION, TIMELINE } from '../data/motion'
-import { MAX_DEPTH, NAV_BY_KEY, levelNodes } from '../data/menu.config'
+import { MAX_DEPTH, NAV_BY_KEY, levelNodes, resolvePath } from '../data/menu.config'
 
 /**
  * 编排模型
@@ -22,6 +22,37 @@ import { MAX_DEPTH, NAV_BY_KEY, levelNodes } from '../data/menu.config'
  */
 export type Stage = 'idle' | 'menu' | 'panel' | 'row'
 
+/**
+ * 标签页快照 = keep-alive。
+ * 只存"看哪一页"（主题 + 下钻路径 + 叶子），内容由 buildView 按快照重算，
+ * 所以标签页不占额外内存，删掉即彻底丢弃。
+ */
+export interface TabSnapshot {
+  id: string
+  /** 标签上显示的短名（最深一级） */
+  label: string
+  /** 悬浮时显示的完整路径 */
+  title: string
+  pickedMenu: string
+  path: string[]
+  leaf: string | null
+}
+
+const tabSig = (t: Pick<TabSnapshot, 'pickedMenu' | 'path' | 'leaf'>) =>
+  `${t.pickedMenu}/${t.path.join('.')}#${t.leaf ?? ''}`
+
+/** 由当前视角推出标签的短名 / 全路径 */
+function viewLabel(menuKey: string, path: string[], leaf: string | null) {
+  const menu = NAV_BY_KEY.get(menuKey)
+  if (!menu) return { label: menuKey, title: menuKey }
+  const labels = [menu.label, ...resolvePath(menu.rows, path).map((n) => n.label)]
+  if (leaf) {
+    const node = levelNodes(menuKey, path).find((n) => n.key === leaf)
+    if (node) labels.push(node.label)
+  }
+  return { label: labels[labels.length - 1] ?? menu.label, title: labels.join(' / ') }
+}
+
 export interface Beat {
   at: number
   patch: Partial<UiPatch>
@@ -42,6 +73,8 @@ export type UiPatch = Pick<
   | 'listDir'
   | 'pickedMenu'
   | 'collapsed'
+  | 'tabs'
+  | 'activeTabId'
 >
 
 export interface UiState {
@@ -60,6 +93,11 @@ export interface UiState {
   listPhase: 'idle' | 'out' | 'in'
   listDir: 'drill' | 'pop'
   collapsed: boolean
+  /** 顶部标签栏：独立于面板显隐，TopBar 退场也不会丢 */
+  tabs: TabSnapshot[]
+  activeTabId: string | null
+  /** 自增，用于生成稳定的 tab id */
+  tabSeq: number
   /** > 0 表示输入闸门关闭，期间吞掉点击 */
   lockMs: number
   beats: Beat[]
@@ -78,6 +116,12 @@ export type UiAction =
   /** 回主页面 = 指令盘；面板 / 看板 / 色带同步撤离，撤完指令盘再飞回 */
   | { type: 'HOME' }
   | { type: 'TOGGLE_COLLAPSE' }
+  /** 把当前视角存成一个标签页（已存在则直接激活） */
+  | { type: 'SAVE_TAB' }
+  /** 切到某个标签页，恢复它保存的视角 */
+  | { type: 'ACTIVATE_TAB'; id: string }
+  /** 删除标签页，连同它保存的状态一起丢掉 */
+  | { type: 'CLOSE_TAB'; id: string }
   | { type: 'BEAT'; patch: Partial<UiPatch> }
   | { type: 'SETTLE' }
 
@@ -94,6 +138,9 @@ export const INITIAL: UiState = {
   listPhase: 'idle',
   listDir: 'drill',
   collapsed: false,
+  tabs: [],
+  activeTabId: null,
+  tabSeq: 0,
   lockMs: 0,
   beats: [],
   seq: 0,
@@ -136,6 +183,54 @@ export function reducer(state: UiState, action: UiAction): UiState {
     return { ...state, collapsed: !state.collapsed }
   }
 
+  /**
+   * 标签栏操作也绕过闸门：TopBar 在面板落位之前就已经可见，
+   * 这几个动作幂等、可逆，不该让控件"看得见点不动"。
+   * 同样刻意不动 seq / lockMs，避免重置正在跑的编排定时器。
+   */
+  if (action.type === 'SAVE_TAB') {
+    if (!isOpen(state.stage) || !state.pickedMenu) return state
+    const cur = { pickedMenu: state.pickedMenu, path: state.path, leaf: state.leaf }
+    const dup = state.tabs.find((t) => tabSig(t) === tabSig(cur))
+    if (dup) return { ...state, activeTabId: dup.id }
+    const { label, title } = viewLabel(cur.pickedMenu, cur.path, cur.leaf)
+    const tab: TabSnapshot = {
+      id: `tab-${state.tabSeq}`,
+      label,
+      title,
+      pickedMenu: cur.pickedMenu,
+      path: [...cur.path],
+      leaf: cur.leaf,
+    }
+    return { ...state, tabs: [...state.tabs, tab], activeTabId: tab.id, tabSeq: state.tabSeq + 1 }
+  }
+
+  if (action.type === 'ACTIVATE_TAB') {
+    const tab = state.tabs.find((t) => t.id === action.id)
+    if (!tab || !isOpen(state.stage)) return state
+    return {
+      ...state,
+      stage: tab.path.length > 0 ? 'row' : 'panel',
+      pickedMenu: tab.pickedMenu,
+      path: [...tab.path],
+      leaf: tab.leaf,
+      drilling: null,
+      listPhase: 'idle',
+      collapsed: false,
+      activeTabId: tab.id,
+    }
+  }
+
+  if (action.type === 'CLOSE_TAB') {
+    const tabs = state.tabs.filter((t) => t.id !== action.id)
+    if (tabs.length === state.tabs.length) return state
+    return {
+      ...state,
+      tabs,
+      activeTabId: state.activeTabId === action.id ? null : state.activeTabId,
+    }
+  }
+
   if (state.lockMs > 0) return state
 
   switch (action.type) {
@@ -157,6 +252,7 @@ export function reducer(state: UiState, action: UiAction): UiState {
           collapsed: false,
           anchor: true,
           wheel: false,
+          activeTabId: null,
         },
         T.pickMenuLock,
         [
@@ -173,13 +269,20 @@ export function reducer(state: UiState, action: UiAction): UiState {
 
       // 叶子节点：只切看板，不推进层级（也就不触发翻页动画）
       if (!node.children?.length) {
-        return { ...state, leaf: action.key }
+        return { ...state, leaf: action.key, activeTabId: null }
       }
 
       if (state.path.length >= MAX_DEPTH) return state
       return go(
         state,
-        { stage: 'row', leaf: null, drilling: action.key, listPhase: 'out', listDir: 'drill' },
+        {
+          stage: 'row',
+          leaf: null,
+          drilling: action.key,
+          listPhase: 'out',
+          listDir: 'drill',
+          activeTabId: null,
+        },
         T.rowDrill,
         [
           {
@@ -194,22 +297,27 @@ export function reducer(state: UiState, action: UiAction): UiState {
     case 'POP': {
       // 叶子只是"选中"，不算一层：先取消选中，面包屑才会一层一层往回缩。
       // 左侧返回箭头走 force，跳过这一步直接退层。
-      if (!action.force && state.leaf) return { ...state, leaf: null }
+      if (!action.force && state.leaf) return { ...state, leaf: null, activeTabId: null }
       if (state.stage === 'row') {
         const next = state.path.slice(0, -1)
-        return go(state, { leaf: null, listPhase: 'out', listDir: 'pop', drilling: null }, T.rowDrill, [
-          {
-            at: T.rowOut,
-            patch: { path: next, stage: next.length === 0 ? 'panel' : 'row', listPhase: 'in' },
-          },
-          { at: T.rowDrill, patch: { listPhase: 'idle' } },
-        ])
+        return go(
+          state,
+          { leaf: null, listPhase: 'out', listDir: 'pop', drilling: null, activeTabId: null },
+          T.rowDrill,
+          [
+            {
+              at: T.rowOut,
+              patch: { path: next, stage: next.length === 0 ? 'panel' : 'row', listPhase: 'in' },
+            },
+            { at: T.rowDrill, patch: { listPhase: 'idle' } },
+          ],
+        )
       }
       if (state.stage === 'panel') {
         // 退回指令盘：看板先走，面板与按钮等它
         return go(
           state,
-          { stage: 'menu', board: false, leaf: null, listPhase: 'idle' },
+          { stage: 'menu', board: false, leaf: null, listPhase: 'idle', activeTabId: null },
           T.backMenu,
           [{ at: TIMELINE.dashOut, patch: { chrome: false, wheel: true, anchor: false } }],
         )
@@ -226,6 +334,7 @@ export function reducer(state: UiState, action: UiAction): UiState {
             leaf: null,
             drilling: null,
             collapsed: false,
+            activeTabId: null,
           },
           T.openMenu,
         )
@@ -253,6 +362,7 @@ export function reducer(state: UiState, action: UiAction): UiState {
           leaf: null,
           drilling: null,
           listPhase: 'idle',
+          activeTabId: null,
         },
         T.homeToMenu,
         [

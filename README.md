@@ -67,6 +67,28 @@ npm run smoke    # SSR 渲染 + reducer 冒烟
 | 点击面板顶部层级名 / Esc | 先取消叶子选中，再退层；第一层时退回指令盘 |
 | 左上角标题（CmdHeader） | 回到指令盘界面：面板 / 看板 / 色带同刻撤离，撤完指令盘飞回 |
 | 面板右侧 ◁ / ▷ | 面板收起为 3vw 侧边条 / 展开，看板随之拉抻 / 复原 |
+| 顶部「＋ 另存」 | 把当前视角（主题 + 层级 + 叶子）存成一个标签页 |
+| 点击标签页 | 恢复它保存的视角（keep-alive） |
+| 标签右侧 × | 删除该标签页，连同它保存的状态一起丢弃 |
+
+## 标签栏
+
+TopBar 上半是标签栏，下半是面包屑：
+
+```
+┌────────────────────── 顶部色带 ──────────────────────┐
+│ [按渠道划分 ×] [经销商直营 ×]                          │  ← 标签栏
+│ ＋另存  › 按渠道划分 › 经销商直营 › 一级经销商          │  ← 面包屑
+└──────────────────────────────────────────────────────┘
+```
+
+- 快照只存"看哪一页"：`{ pickedMenu, path[], leaf }`。内容由 `buildView()` 按快照重算，
+  所以标签页不占额外内存，删掉就是彻底丢弃。
+- 同一个视角重复另存会自动去重，直接激活已有标签。
+- **退场不销毁**：`tabs` 存在 reducer 里，TopBar 只负责渲染。面板收起 / 回指令盘再进来，
+  标签栏原样恢复（`npm test` 的第 10 组就是盯这个）。
+- 任何导航（选主题、下钻、返回）都会清掉 `activeTabId`——高亮表示"当前视角就是这个标签存的"，
+  一旦你把它改了就自然脱开；快照本身仍在。
 
 ## 面板结构
 
@@ -80,9 +102,13 @@ npm run smoke    # SSR 渲染 + reducer 冒烟
 │       └─ .panel-row         div[role=button] × N
 └─ .panel-tab                 收起把手（绝对定位，不随列表滚动）
 
-.topbar
+.topbar                       高度 7vh，与 CmdHeader 等高对齐
 ├─ .topbar-band               色带本体，scaleX 从右扫入（独立一层，不压扁文字）
-└─ .topbar-crumbs             面包屑，起点 = 21vw + 间距，永远在 CmdHeader 右边
+└─ .topbar-inner              起点 = 21vw + 间距，永远在 CmdHeader 右边
+    ├─ .tabbar                上半：标签页（横向可滚，隐藏滚动条）
+    │   ├─ .tab               标签（含 .tab-label / .tab-close）
+    │   └─ .tabbar-empty      空态提示
+    └─ .crumbbar              下半：.tab-save + .topbar-crumbs
 ```
 
 - 层级用 `state.path: string[]` 表示，`levelNodes(menuKey, path)` 解析当前层的项，
@@ -129,7 +155,7 @@ src/
     CommandWheel.tsx       九宫指令按钮
     CmdHeader.tsx          左上角标题（原 #btn_LT_b）
     SidePanel.tsx          多级导航面板（返回条 + 滚动列表 + 收起把手）
-    TopBar.tsx             顶部色带 + 面包屑
+    TopBar.tsx             顶部色带：上半标签栏 + 下半面包屑与「另存」
     Backdrop.tsx           遮罩（原 #battleMenuS）
     Dashboard.tsx          KPI + 三块 ECharts 图表
   charts/

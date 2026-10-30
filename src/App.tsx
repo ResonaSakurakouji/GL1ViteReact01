@@ -6,7 +6,6 @@ import { Dashboard } from './components/Dashboard'
 import { SidePanel } from './components/SidePanel'
 import { TopBar } from './components/TopBar'
 import { buildView } from './data/dashboard'
-import { NAV_BY_KEY, levelNodes, resolvePath } from './data/menu.config'
 import { makeInitialState, reducer, type Stage } from './state/machine'
 
 function Hints({ stage }: { stage: Stage }) {
@@ -31,18 +30,6 @@ export default function App() {
     () => buildView(state.pickedMenu, state.path, state.leaf),
     [state.pickedMenu, state.path, state.leaf],
   )
-
-  /** 顶部色带里的面包屑：一级菜单 + 下钻过的每一层 + 当前选中的叶子 */
-  const crumbs = useMemo(() => {
-    const menu = state.pickedMenu ? NAV_BY_KEY.get(state.pickedMenu) : undefined
-    if (!menu) return []
-    const trail = [menu.label, ...resolvePath(menu.rows, state.path).map((n) => n.label)]
-    if (state.leaf) {
-      const leaf = levelNodes(state.pickedMenu, state.path).find((n) => n.key === state.leaf)
-      if (leaf) trail.push(leaf.label)
-    }
-    return trail
-  }, [state.pickedMenu, state.path, state.leaf])
 
   /**
    * 编排节拍：每次换编排带一串 {at, patch}，在这里挂成定时器。
@@ -83,7 +70,7 @@ export default function App() {
       <Backdrop stage={state.stage} />
       <Dashboard view={view} active={state.board} compact={state.collapsed} />
       <CommandWheel state={state} dispatch={dispatch} />
-      <TopBar active={state.chrome} crumbs={crumbs} />
+      <TopBar state={state} dispatch={dispatch} />
       <CmdHeader state={state} dispatch={dispatch} />
       <SidePanel state={state} dispatch={dispatch} />
       <Hints stage={state.stage} />

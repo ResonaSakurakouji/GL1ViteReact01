@@ -180,7 +180,89 @@ check('9 个按钮都在位', qa('.cmd-btn').length === 9)
 check('面板关闭后为 inert', q('.panel')?.hasAttribute('inert') === true)
 check('面板不再有 aria-hidden', q('.panel')?.hasAttribute('aria-hidden') === false)
 
-console.log('\n=== 9. 深链直达深层 + 叶子 ===')
+console.log('\n=== 9. 标签页：另存 / 恢复 / 删除 / keep-alive ===')
+await settle(300) // 等 HOME 的闸门彻底放开
+const btn3 = qa('.cmd-btn').find((b) => b.textContent?.includes('按渠道'))
+await click(btn3)
+await settle(1100)
+check('回到 panel', q('.stage')?.dataset.stage === 'panel')
+check('初始没有标签', qa('.tab').length === 0, `got ${qa('.tab').length}`)
+check('显示空态提示', q('.tabbar-empty') !== null)
+check('另存控件在面包屑左侧', Boolean(q('.crumbbar .tab-save')) && Boolean(q('.crumbbar .topbar-crumbs')))
+
+// 存第一个标签（第一层）
+await click(q('.tab-save'))
+await settle(120)
+check('存出第 1 个标签', qa('.tab').length === 1, `got ${qa('.tab').length}`)
+check('标签名取最深一级', q('.tab-label')?.textContent === '按渠道划分', `got "${q('.tab-label')?.textContent}"`)
+check('新标签自动选中', q('.tab')?.dataset.active === 'true')
+
+// 换个视角：下钻一层，标签应脱开高亮
+await click(qa('.panel-row')[0])
+await settle(500)
+check('下钻后标签不再高亮', q('.tab')?.dataset.active === 'false')
+await click(q('.tab-save'))
+await settle(120)
+check('存出第 2 个标签', qa('.tab').length === 2, `got ${qa('.tab').length}`)
+check('第 2 个标签名', qa('.tab-label')[1]?.textContent === '经销商直营', `got "${qa('.tab-label')[1]?.textContent}"`)
+
+// 点第 1 个标签恢复
+await click(qa('.tab')[0])
+await settle(200)
+check('恢复面包屑', crumbs().join('|') === '按渠道划分', `got "${crumbs().join('|')}"`)
+check('恢复层级名', levelName() === '按渠道划分', `got "${levelName()}"`)
+check('恢复列表 6 项', labels().length === 6, `got ${labels().length}`)
+check('看板标题跟随', dashTitle().includes('按渠道划分'), `got "${dashTitle()}"`)
+check('被点的标签高亮', qa('.tab')[0]?.dataset.active === 'true')
+
+// 同一视角再存一次 → 去重
+await click(q('.tab-save'))
+await settle(120)
+check('重复视角不新增标签', qa('.tab').length === 2, `got ${qa('.tab').length}`)
+
+console.log('\n=== 10. TopBar 退场后标签不销毁 ===')
+await click(q('.cmd-header'))
+await settle(1100)
+check('已回到 menu', q('.stage')?.dataset.stage === 'menu')
+check('TopBar 已隐藏', q('.topbar')?.dataset.active === 'false')
+check('TopBar 为 inert', q('.topbar')?.hasAttribute('inert') === true)
+check('标签仍在（未销毁）', qa('.tab').length === 2, `got ${qa('.tab').length}`)
+
+const btn4 = qa('.cmd-btn').find((b) => b.textContent?.includes('按区域'))
+await click(btn4)
+await settle(1100)
+check('再次进入 panel', q('.stage')?.dataset.stage === 'panel')
+check('标签栏原样恢复', qa('.tab').length === 2, `got ${qa('.tab').length}`)
+check('恢复后无标签高亮', qa('.tab').every((t) => t.dataset.active === 'false'))
+
+await click(qa('.tab')[1])
+await settle(200)
+check('跨主题恢复也能生效', crumbs().join('|') === '按渠道划分|经销商直营', `got "${crumbs().join('|')}"`)
+
+console.log('\n=== 11. 删除标签 ===')
+check('关闭控件在标签右侧', q('.tab .tab-close') !== null)
+await act(async () => {
+  qa('.tab-close')[0].click()
+  await wait(30)
+})
+await settle(120)
+check('删除一个', qa('.tab').length === 1, `got ${qa('.tab').length}`)
+check('剩下的那个', q('.tab-label')?.textContent === '经销商直营', `got "${q('.tab-label')?.textContent}"`)
+check(
+  '被删的标签不再保存状态',
+  qa('.tab-label').every((n) => n.textContent !== '按渠道划分'),
+  `剩余 ${qa('.tab-label').map((n) => n.textContent).join(',')}`,
+)
+
+await act(async () => {
+  qa('.tab-close')[0].click()
+  await wait(30)
+})
+await settle(120)
+check('全部删除', qa('.tab').length === 0, `got ${qa('.tab').length}`)
+check('回到空态', q('.tabbar-empty') !== null)
+
+console.log('\n=== 12. 深链直达深层 + 叶子 ===')
 await act(async () => {
   root.unmount()
 })

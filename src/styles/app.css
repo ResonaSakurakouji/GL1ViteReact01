@@ -47,6 +47,8 @@
   --panel-w: 21vw;
   /* 面板高度固定，不随条目多少变化；多出来的在内部滚动 */
   --panel-h: 63vh;
+  /* 顶部色带高度：上半标签栏 + 下半面包屑，和 CmdHeader 等高以便对齐 */
+  --topbar-h: 7vh;
   /* 收起把手宽度；同时也是列表给滚动条让出的宽度 */
   --tab-w: 3vw;
   /* 面板收起后露出的侧边条宽度 = 把手宽度 */
@@ -120,22 +122,20 @@ button:disabled {
   transition: opacity var(--dur-panel) var(--ease-io);
 }
 
-/* ---------- 顶部色带（原 #t0Bar） ---------- */
+/* ---------- 顶部色带（原 #t0Bar）：上半标签栏 + 下半面包屑 ---------- */
 
 .topbar {
   position: fixed;
   right: 0;
-  top: 1.5vh;
-  height: 4vh;
+  top: 0;
+  height: var(--topbar-h);
   width: 100vw;
   z-index: 20;
-  display: flex;
-  align-items: center;
   overflow: hidden;
   pointer-events: none;
 }
 
-/* 色带本体单独一层做 scaleX 扫入，面包屑不跟着被压扁 */
+/* 色带本体单独一层做 scaleX 扫入，里面的文字不跟着被压扁 */
 .topbar-band {
   position: absolute;
   inset: 0;
@@ -149,25 +149,182 @@ button:disabled {
   transform: scaleX(1);
 }
 
-/* 起点让开左上角标题（21vw + 间距），相当于把色带左侧裁掉一截 */
-.topbar-crumbs {
+/* 内容区整体让开左上角标题（21vw + 间距），相当于把色带左侧裁掉一截 */
+.topbar-inner {
   position: relative;
-  margin: 0 0 0 calc(var(--panel-w) + var(--gutter));
+  height: 100%;
+  margin-left: calc(var(--panel-w) + var(--gutter));
+  padding-right: var(--gutter);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity var(--dur-panel) linear;
+}
+
+.topbar[data-active='true'] .topbar-inner {
+  opacity: 1;
+}
+
+/* 退场时别挡住下面（inert 已能拦点击，这里再显式一层，兼容旧引擎） */
+.topbar[data-active='false'] .topbar-inner {
+  pointer-events: none;
+}
+
+/* 上半：标签栏 */
+.tabbar {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4vw;
+  min-width: 0;
+  padding-bottom: 0.3vh;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+.tabbar-empty {
+  font-size: clamp(8px, 1.1vh, 11px);
+  letter-spacing: 0.12em;
+  color: rgba(18, 22, 24, 0.38);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 0.35vw;
+  height: 2.8vh;
+  max-width: 13vw;
+  padding: 0 0.5vw 0 0.75vw;
+  border-radius: 4px 4px 0 0;
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(18, 22, 24, 0.62);
+  font-size: clamp(8px, 1.15vh, 12px);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--dur-fast) linear,
+    color var(--dur-fast) linear;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.tab[data-active='true'] {
+  background: rgba(255, 255, 255, 0.62);
+  color: #12181a;
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 #2b3134;
+}
+
+.tab:focus-visible {
+  outline: 2px solid #2b3134;
+  outline-offset: -2px;
+}
+
+.tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  flex: 0 0 auto;
+  width: 1.4vh;
+  height: 1.4vh;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2vh;
+  line-height: 1;
+  opacity: 0.4;
+  transition:
+    opacity var(--dur-fast) linear,
+    background-color var(--dur-fast) linear;
+}
+
+.tab:hover .tab-close {
+  opacity: 0.7;
+}
+
+.tab-close:hover {
+  opacity: 1;
+  background-color: rgba(190, 60, 45, 0.85);
+  color: #fff;
+}
+
+/* 下半：另存为标签页 + 面包屑 */
+.crumbbar {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.6vw;
+  min-width: 0;
+}
+
+.tab-save {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.2vh;
+  padding: 0 0.6vw;
+  border-radius: 3px;
+  border: 1px solid rgba(18, 22, 24, 0.32);
+  color: rgba(18, 22, 24, 0.72);
+  font-size: clamp(8px, 1.1vh, 11px);
+  letter-spacing: 0.08em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--dur-fast) linear,
+    color var(--dur-fast) linear,
+    border-color var(--dur-fast) linear;
+}
+
+.tab-save:hover {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(18, 22, 24, 0.55);
+  color: #12181a;
+}
+
+.tab-save:focus-visible {
+  outline: 2px solid #2b3134;
+  outline-offset: 1px;
+}
+
+.tab-save[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.topbar-crumbs {
+  margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   align-items: center;
   gap: 0.55vw;
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
   font-size: clamp(8px, 1.25vh, 13px);
   letter-spacing: 0.14em;
   color: rgba(18, 22, 24, 0.55);
-  opacity: 0;
-  transition: opacity var(--dur-panel) linear;
-}
-
-.topbar[data-active='true'] .topbar-crumbs {
-  opacity: 1;
 }
 
 .topbar-crumbs li {
@@ -185,7 +342,6 @@ button:disabled {
   color: #12181a;
   font-weight: 700;
 }
-
 /* ---------- 九宫指令按钮 ---------- */
 
 .cmd-btn {

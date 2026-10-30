@@ -89,6 +89,15 @@ const deepLink = makeInitialState('?stage=row&menu=region&path=sh,pudong&leaf=pu
 console.log('深链         ->', deepLink.stage, 'path', JSON.stringify(deepLink.path), 'leaf', deepLink.leaf)
 console.log('MAX_DEPTH    ->', MAX_DEPTH)
 
+// 标签页：另存 / 去重 / 删除
+let ts = makeInitialState('?stage=panel&menu=channel')
+ts = reducer(ts, { type: 'SAVE_TAB' })
+const once = ts.tabs.length
+ts = reducer(ts, { type: 'SAVE_TAB' })
+console.log('SAVE_TAB ×2  ->', ts.tabs.length === once ? '去重 ✓' : '重复 ✗', 'label=' + ts.tabs[0]?.label)
+ts = reducer(ts, { type: 'CLOSE_TAB', id: ts.tabs[0].id })
+console.log('CLOSE_TAB    ->', '剩余', ts.tabs.length, 'active=' + ts.activeTabId)
+
 /**
  * app.css 的 :root 里为 IDE 解析保留了一份时长兜底值，
  * 真实来源是 motion.ts。这里校验两边没跑偏，避免"改了 TS 忘了 CSS"。
