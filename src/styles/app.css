@@ -47,8 +47,11 @@
   --panel-w: 21vw;
   /* 面板高度固定，不随条目多少变化；多出来的在内部滚动 */
   --panel-h: 63vh;
-  /* 顶部色带高度：上半标签栏 + 下半面包屑，和 CmdHeader 等高以便对齐 */
-  --topbar-h: 7vh;
+  /* 顶部色带：只放面包屑，4vh 刚好；标签栏单独一层，可以戳出色带上方 */
+  --topbar-h: 4vh;
+  --topbar-top: 1.5vh;
+  /* 标签栏整体高度（含底部滚动条），不受 --topbar-h 限制 */
+  --tab-h: 3vh;
   /* 收起把手宽度；同时也是列表给滚动条让出的宽度 */
   --tab-w: 3vw;
   /* 面板收起后露出的侧边条宽度 = 把手宽度 */
@@ -122,16 +125,17 @@ button:disabled {
   transition: opacity var(--dur-panel) var(--ease-io);
 }
 
-/* ---------- 顶部色带（原 #t0Bar）：上半标签栏 + 下半面包屑 ---------- */
+/* ---------- 顶部色带（原 #t0Bar）：色带放面包屑，标签栏戳在上面 ---------- */
 
 .topbar {
   position: fixed;
   right: 0;
-  top: 0;
+  top: var(--topbar-top);
   height: var(--topbar-h);
   width: 100vw;
   z-index: 20;
-  overflow: hidden;
+  /* 标签栏要能超出色带顶部，所以这里不能裁剪 */
+  overflow: visible;
   pointer-events: none;
 }
 
@@ -154,9 +158,6 @@ button:disabled {
   position: relative;
   height: 100%;
   margin-left: calc(var(--panel-w) + var(--gutter));
-  padding-right: var(--gutter);
-  display: flex;
-  flex-direction: column;
   min-width: 0;
   opacity: 0;
   pointer-events: auto;
@@ -172,21 +173,48 @@ button:disabled {
   pointer-events: none;
 }
 
-/* 上半：标签栏 */
+/* 上半：标签栏。bottom:60% + 固定高度，让它一半悬在色带上方
+   —— 4vh 的色带就只留给面包屑，字体大小不用变 */
 .tabbar {
-  flex: 1 1 50%;
+  position: absolute;
+  left: 0;
+  right: var(--gutter);
+  bottom: 50%;
+  height: var(--tab-h);
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 0.4vw;
   min-width: 0;
-  padding-bottom: 0.3vh;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none;
+  transform: translateY(0);
+  transition: transform var(--dur-panel) var(--ease-out);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(18, 22, 24, 0.5) rgba(18, 22, 24, 0.08);
 }
 
+/* 退场时整排往上抽走，配合 .topbar-inner 的淡出 = 向上逐渐消失 */
+.topbar[data-active='false'] .tabbar {
+  transform: translateY(-2vh);
+}
+
+/* 标签多了才出现，贴着标签栏底部（也就是色带上沿附近），可直接拖 */
 .tabbar::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.tabbar::-webkit-scrollbar-track {
+  background: rgba(18, 22, 24, 0.1);
+  border-radius: 3px;
+}
+
+.tabbar::-webkit-scrollbar-thumb {
+  background: rgba(18, 22, 24, 0.5);
+  border-radius: 3px;
+}
+
+.tabbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 22, 24, 0.78);
 }
 
 .tabbar-empty {
@@ -195,18 +223,21 @@ button:disabled {
   color: rgba(18, 22, 24, 0.38);
   white-space: nowrap;
   line-height: 1;
+  padding-top: 0.5vh;
 }
 
 .tab {
   display: flex;
   align-items: center;
   gap: 0.35vw;
-  height: 2.8vh;
+  height: 2.1vh;
   max-width: 13vw;
   padding: 0 0.5vw 0 0.75vw;
   border-radius: 4px 4px 0 0;
-  background: rgba(255, 255, 255, 0.16);
-  color: rgba(18, 22, 24, 0.62);
+  /* 未激活 = 色带本体的颜色（取 #676d69 → #9eabb4 这一段的中段），实色不透明 */
+  background-color: #6f7672;
+  background-image: none;
+  color: rgba(242, 244, 243, 0.82);
   font-size: clamp(8px, 1.15vh, 12px);
   line-height: 1;
   white-space: nowrap;
@@ -214,18 +245,29 @@ button:disabled {
   outline: none;
   transition:
     background-color var(--dur-fast) linear,
-    color var(--dur-fast) linear;
+    color var(--dur-fast) linear,
+    box-shadow var(--dur-fast) linear;
 }
 
 .tab:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background-color: #808783;
+  color: #fff;
 }
 
+/* 已激活 = 指令按钮那套金色，和全局主题一致 */
 .tab[data-active='true'] {
-  background: rgba(255, 255, 255, 0.62);
-  color: #12181a;
+  background-color: var(--gold-b);
+  background-image: radial-gradient(ellipse at center, var(--gold-a), var(--gold-b));
+  color: var(--gold-ink);
   font-weight: 700;
-  box-shadow: inset 0 -2px 0 #2b3134;
+  text-shadow: 0 1px 0 rgba(255, 240, 214, 0.28);
+  box-shadow: inset 0 -2px 0 var(--gold-hi);
+}
+
+.tab[data-active='true']:hover {
+  background-color: var(--gold-b);
+  background-image: radial-gradient(ellipse at center, #d5a077, #965f37);
+  color: var(--gold-ink);
 }
 
 .tab:focus-visible {
@@ -265,9 +307,13 @@ button:disabled {
   color: #fff;
 }
 
-/* 下半：另存为标签页 + 面包屑 */
+/* 下半：另存为标签页 + 面包屑，只占色带下部 60% */
 .crumbbar {
-  flex: 1 1 50%;
+  position: absolute;
+  left: 0;
+  right: var(--gutter);
+  top: 50%;
+  bottom: 0;
   display: flex;
   align-items: center;
   gap: 0.6vw;
@@ -342,7 +388,17 @@ button:disabled {
   color: #12181a;
   font-weight: 700;
 }
+
 /* ---------- 九宫指令按钮 ---------- */
+
+/* 指令盘整层的显隐。
+   只在 OPEN_MENU / PICK_MENU / 退回指令盘 / HOME 这几段编排里可见；
+   面板内的一切操作（下钻、收起、换标签）都把它压成纯透明。
+   刻意不加过渡：飞行过程必须一帧都不能露，淡出淡入都会穿帮。 */
+.wheel[data-layer='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
 
 .cmd-btn {
   position: fixed;
@@ -428,6 +484,12 @@ button:disabled {
   font-size: clamp(11px, 2.1vh, 22px);
   font-weight: 700;
   line-height: 1;
+  transition: opacity var(--dur-row) linear;
+}
+
+/* 换标签时标题跟着淡掉，和左侧列表同步——不然文字会在半途硬切 */
+.stage[data-swap='true'] .cmd-header-label {
+  opacity: 0;
 }
 
 .cmd-header-hint {
@@ -544,6 +606,9 @@ button:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition:
+    opacity var(--dur-row) linear,
+    transform var(--dur-row) var(--ease-io);
 }
 
 .panel-name-hint {
@@ -555,6 +620,9 @@ button:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition:
+    opacity var(--dur-row) linear,
+    transform var(--dur-row) var(--ease-io);
 }
 
 /* 滚动容器：宽度让出把手，滚动条不会钻到把手底下 */
@@ -659,6 +727,27 @@ button:disabled {
   animation: list-pop var(--dur-row) var(--ease-out) both;
 }
 
+/* 换标签页：整块列表先向左飞走 */
+.panel[data-phase='out'][data-dir='swap'] .panel-rows {
+  transform: translateX(-19vw);
+  opacity: 0;
+  transition:
+    transform var(--dur-row) var(--ease-io),
+    opacity var(--dur-row) linear;
+}
+
+/* 换完内容后从右侧飞回（和 drill 同向，读起来像"翻到下一页"） */
+.panel[data-phase='in'][data-dir='swap'] .panel-rows {
+  animation: list-swap var(--dur-row) var(--ease-out) both;
+}
+
+/* 头部层级名跟着一起淡掉，避免列表飞走时文字硬切 */
+.panel[data-phase='out'][data-dir='swap'] .panel-name-text,
+.panel[data-phase='out'][data-dir='swap'] .panel-name-hint {
+  opacity: 0;
+  transform: translateX(-0.8vw);
+}
+
 @keyframes list-drill {
   from {
     transform: translateX(16vw);
@@ -673,6 +762,17 @@ button:disabled {
 @keyframes list-pop {
   from {
     transform: translateX(-16vw);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes list-swap {
+  from {
+    transform: translateX(16vw);
     opacity: 0;
   }
   to {

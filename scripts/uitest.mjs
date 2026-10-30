@@ -79,11 +79,13 @@ console.log('\n=== 1. idle → menu → panel ===')
 check('初始为 idle', q('.stage')?.dataset.stage === 'idle')
 await click(q('.stage'))
 check('进入 menu', q('.stage')?.dataset.stage === 'menu')
+check('指令盘整层可见', q('.wheel')?.dataset.layer === 'true')
 await settle(800)
 const btn = qa('.cmd-btn').find((b) => b.textContent?.includes('按渠道'))
 await click(btn)
 await settle(1100)
 check('进入 panel', q('.stage')?.dataset.stage === 'panel')
+check('面板里指令盘整层透明', q('.wheel')?.dataset.layer === 'false')
 check('一层 6 项', labels().length === 6, `got ${labels().length}`)
 
 console.log('\n=== 1b. 图表用 ECharts 挂载 ===')
@@ -206,9 +208,27 @@ await settle(120)
 check('存出第 2 个标签', qa('.tab').length === 2, `got ${qa('.tab').length}`)
 check('第 2 个标签名', qa('.tab-label')[1]?.textContent === '经销商直营', `got "${qa('.tab-label')[1]?.textContent}"`)
 
-// 点第 1 个标签恢复
+// 点第 1 个标签恢复：列表先向左飞出，换完内容再从右侧飞回
+resetClock()
 await click(qa('.tab')[0])
-await settle(200)
+check(
+  '切换瞬间列表开始向左飞',
+  q('.panel')?.dataset.phase === 'out' && q('.panel')?.dataset.dir === 'swap',
+  `got ${q('.panel')?.dataset.phase}/${q('.panel')?.dataset.dir}`,
+)
+check(
+  '飞走期间还没换内容',
+  crumbs().join('|') === '按渠道划分|经销商直营',
+  `got "${crumbs().join('|')}"`,
+)
+check('飞走期间指令盘不可见', q('.wheel')?.dataset.layer === 'false')
+check('飞走期间标题同步淡出', q('.stage')?.dataset.swap === 'true')
+await at(240)
+check('192ms 后换内容', crumbs().join('|') === '按渠道划分', `got "${crumbs().join('|')}"`)
+check('新内容从右侧飞入', q('.panel')?.dataset.phase === 'in', `got ${q('.panel')?.dataset.phase}`)
+await at(460)
+check('相位已结束', q('.panel')?.dataset.phase === 'idle', `got ${q('.panel')?.dataset.phase}`)
+check('标题淡回', q('.stage')?.dataset.swap === 'false')
 check('恢复面包屑', crumbs().join('|') === '按渠道划分', `got "${crumbs().join('|')}"`)
 check('恢复层级名', levelName() === '按渠道划分', `got "${levelName()}"`)
 check('恢复列表 6 项', labels().length === 6, `got ${labels().length}`)
@@ -224,6 +244,7 @@ console.log('\n=== 10. TopBar 退场后标签不销毁 ===')
 await click(q('.cmd-header'))
 await settle(1100)
 check('已回到 menu', q('.stage')?.dataset.stage === 'menu')
+check('指令盘整层重新可见', q('.wheel')?.dataset.layer === 'true')
 check('TopBar 已隐藏', q('.topbar')?.dataset.active === 'false')
 check('TopBar 为 inert', q('.topbar')?.hasAttribute('inert') === true)
 check('标签仍在（未销毁）', qa('.tab').length === 2, `got ${qa('.tab').length}`)

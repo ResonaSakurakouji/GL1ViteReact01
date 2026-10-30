@@ -41,8 +41,10 @@ export function CommandWheel({ state, dispatch }: Props) {
   }, [open])
 
   return (
-    // 用 inert 而不是 aria-hidden：它同时移出无障碍树、禁止聚焦和点击
-    <div className="wheel" ref={hostRef} inert={!open}>
+    // 用 inert 而不是 aria-hidden：它同时移出无障碍树、禁止聚焦和点击。
+    // data-layer=false 时整层纯透明 —— 面板里换主题时，被锚在角落的那枚
+    // 会飞回画外、新的那枚再飞进来，这段过程不该被看见。
+    <div className="wheel" ref={hostRef} inert={!open} data-layer={state.wheelLayer}>
       {NAV.map((item) => {
         // anchor 一旦落下就钉在左上角，直到 beats 在 256ms 后把它放回来
         const picked = state.anchor && state.pickedMenu === item.key

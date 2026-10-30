@@ -9,6 +9,10 @@ import { MAX_DEPTH, NAV_BY_KEY, levelNodes, resolvePath } from '../data/menu.con
  * 波浪错峰（--delay）。
  *
  *   wheel  —— 指令盘是否在位（9 个按钮是否展开）
+ *   wheelLayer —— 指令盘这一层是否允许被看见。只有 OPEN_MENU / PICK_MENU /
+ *                POP 回指令盘 / HOME 这几段编排期间为 true；面板里任何操作
+ *                （下钻、收起、换标签）都是 false —— 否则被锚在角落的那枚
+ *                会在换主题时横穿屏幕飞到画外，非常抢眼
  *   anchor —— 被选中的那枚是否钉在左上角
  *   chrome —— 左侧面板 / 顶部色带是否就位
  *   board  —— 主看板是否就位
@@ -61,6 +65,7 @@ export interface Beat {
 export type UiPatch = Pick<
   UiState,
   | 'wheel'
+  | 'wheelLayer'
   | 'anchor'
   | 'chrome'
   | 'board'
@@ -80,6 +85,8 @@ export type UiPatch = Pick<
 export interface UiState {
   stage: Stage
   wheel: boolean
+  /** 指令盘这层是否可见（见文件头的编排说明） */
+  wheelLayer: boolean
   anchor: boolean
   chrome: boolean
   board: boolean
@@ -91,11 +98,23 @@ export interface UiState {
   /** 正在飞向面板顶部的那一项，只服务于离场动画 */
   drilling: string | null
   listPhase: 'idle' | 'out' | 'in'
-  listDir: 'drill' | 'pop'
+  /**
+   * 列表离场 / 入场的朝向：
+   *   drill —— 下钻：向左飞走，新的从右侧进来
+   *   pop   —— 返回：向右飞走，上一层的从左侧回来
+   *   swap  —— 换标签页：整块向左飞走，换完从右侧进来
+   */
+  listDir: 'drill' | 'pop' | 'swap'
   collapsed: boolean
   /** 顶部标签栏：独立于面板显隐，TopBar 退场也不会丢 */
   tabs: TabSnapshot[]
   activeTabId: string | null
+  /**
+   * 换标签的相位：先把指令盘整体淡成透明，淡完再换快照，最后淡回来。
+   * 否则切到别的主题时，锚在左上角的那枚会飞回原位、新的那枚再飞出来。
+   */
+  swapping: boolean
+  pendingTab: string | null
   /** 自增，用于生成稳定的 tab id */
   tabSeq: number
   /** > 0 表示输入闸门关闭，期间吞掉点击 */
@@ -118,8 +137,12 @@ export type UiAction =
   | { type: 'TOGGLE_COLLAPSE' }
   /** 把当前视角存成一个标签页（已存在则直接激活） */
   | { type: 'SAVE_TAB' }
-  /** 切到某个标签页，恢复它保存的视角 */
+  /** 切到某个标签页：先让列表向左飞出，由 COMMIT_TAB 换内容、END_SWAP 收尾 */
   | { type: 'ACTIVATE_TAB'; id: string }
+  /** 列表飞走了，落下快照并从右侧飞回 */
+  | { type: 'COMMIT_TAB' }
+  /** 列表飞回来了，结束换页相位 */
+  | { type: 'END_SWAP' }
   /** 删除标签页，连同它保存的状态一起丢掉 */
   | { type: 'CLOSE_TAB'; id: string }
   | { type: 'BEAT'; patch: Partial<UiPatch> }
@@ -128,6 +151,7 @@ export type UiAction =
 export const INITIAL: UiState = {
   stage: 'idle',
   wheel: false,
+  wheelLayer: false,
   anchor: false,
   chrome: false,
   board: false,
@@ -140,6 +164,8 @@ export const INITIAL: UiState = {
   collapsed: false,
   tabs: [],
   activeTabId: null,
+  swapping: false,
+  pendingTab: null,
   tabSeq: 0,
   lockMs: 0,
   beats: [],
@@ -207,7 +233,27 @@ export function reducer(state: UiState, action: UiAction): UiState {
 
   if (action.type === 'ACTIVATE_TAB') {
     const tab = state.tabs.find((t) => t.id === action.id)
-    if (!tab || !isOpen(state.stage)) return state
+    if (!tab || !isOpen(state.stage) || state.swapping) return state
+    // 视角没变就是同一个标签：只补高亮，不用重放动画
+    if (state.pickedMenu) {
+      const cur = { pickedMenu: state.pickedMenu, path: state.path, leaf: state.leaf }
+      if (tabSig(tab) === tabSig(cur)) return { ...state, activeTabId: tab.id }
+    }
+    // 先让面板列表整体向左飞出，真正换内容交给 COMMIT_TAB（192ms 后）
+    return {
+      ...state,
+      swapping: true,
+      pendingTab: tab.id,
+      drilling: null,
+      listPhase: 'out',
+      listDir: 'swap',
+    }
+  }
+
+  if (action.type === 'COMMIT_TAB') {
+    const tab = state.pendingTab ? state.tabs.find((t) => t.id === state.pendingTab) : undefined
+    // 换页途中面板被关掉（HOME / 退回指令盘）就放弃这次换页
+    if (!tab || !isOpen(state.stage)) return { ...state, pendingTab: null }
     return {
       ...state,
       stage: tab.path.length > 0 ? 'row' : 'panel',
@@ -215,10 +261,16 @@ export function reducer(state: UiState, action: UiAction): UiState {
       path: [...tab.path],
       leaf: tab.leaf,
       drilling: null,
-      listPhase: 'idle',
-      collapsed: false,
       activeTabId: tab.id,
+      pendingTab: null,
+      // 新内容整块挂载（.panel-rows 的 key 变了），从右侧飞回来
+      listPhase: 'in',
+      listDir: 'swap',
     }
+  }
+
+  if (action.type === 'END_SWAP') {
+    return { ...state, swapping: false, pendingTab: null, listPhase: 'idle' }
   }
 
   if (action.type === 'CLOSE_TAB') {
@@ -236,7 +288,7 @@ export function reducer(state: UiState, action: UiAction): UiState {
   switch (action.type) {
     case 'OPEN_MENU':
       if (state.stage !== 'idle') return state
-      return go(state, { stage: 'menu', wheel: true }, T.openMenu)
+      return go(state, { stage: 'menu', wheel: true, wheelLayer: true }, T.openMenu)
 
     case 'PICK_MENU':
       if (state.stage !== 'menu') return state
@@ -256,13 +308,15 @@ export function reducer(state: UiState, action: UiAction): UiState {
         },
         T.pickMenuLock,
         [
-          { at: TIMELINE.lead, patch: { chrome: true } },
+          // 672ms：退场波浪结束，面板与色带接手，指令盘这一层从此不再需要被看见
+          { at: TIMELINE.lead, patch: { chrome: true, wheelLayer: false } },
           { at: T.pickMenuLock, patch: { board: true } },
         ],
       )
 
     case 'PICK_ROW': {
-      if (!isOpen(state.stage) || state.collapsed) return state
+      // 换页动画期间不接受列表操作：列表正在飞，点了只会打架
+      if (!isOpen(state.stage) || state.collapsed || state.swapping) return state
       const items = levelNodes(state.pickedMenu, state.path)
       const node = items.find((n) => n.key === action.key)
       if (!node) return state
@@ -295,6 +349,8 @@ export function reducer(state: UiState, action: UiAction): UiState {
     }
 
     case 'POP': {
+      // 同上：换页动画期间不接受返回
+      if (state.swapping) return state
       // 叶子只是"选中"，不算一层：先取消选中，面包屑才会一层一层往回缩。
       // 左侧返回箭头走 force，跳过这一步直接退层。
       if (!action.force && state.leaf) return { ...state, leaf: null, activeTabId: null }
@@ -319,7 +375,12 @@ export function reducer(state: UiState, action: UiAction): UiState {
           state,
           { stage: 'menu', board: false, leaf: null, listPhase: 'idle', activeTabId: null },
           T.backMenu,
-          [{ at: TIMELINE.dashOut, patch: { chrome: false, wheel: true, anchor: false } }],
+          [
+            {
+              at: TIMELINE.dashOut,
+              patch: { chrome: false, wheel: true, wheelLayer: true, anchor: false },
+            },
+          ],
         )
       }
       if (state.stage === 'menu') {
@@ -337,6 +398,8 @@ export function reducer(state: UiState, action: UiAction): UiState {
             activeTabId: null,
           },
           T.openMenu,
+          // 9 枚全部飞出去之后，这一层也收起来
+          [{ at: T.openMenu, patch: { wheelLayer: false } }],
         )
       }
       return state
@@ -367,7 +430,7 @@ export function reducer(state: UiState, action: UiAction): UiState {
         T.homeToMenu,
         [
           // 面板撤走之后，指令盘才回来；此时放开锚点，按钮直接飞回最终位置
-          { at: MOTION.durPanel, patch: { wheel: true, anchor: false } },
+          { at: MOTION.durPanel, patch: { wheel: true, wheelLayer: true, anchor: false } },
           // 等左上角标题淡出（128ms）后再清内容，避免它变成一条空的灰条
           {
             at: MOTION.durPanel + MOTION.durFast,
@@ -395,7 +458,7 @@ export function makeInitialState(search = window.location.search): UiState {
   const wanted = rawPath.split(',').map((s) => s.trim()).filter(Boolean)
   const leafKey = params.get('leaf')
 
-  if (stage === 'menu') return { ...INITIAL, stage: 'menu', wheel: true }
+  if (stage === 'menu') return { ...INITIAL, stage: 'menu', wheel: true, wheelLayer: true }
 
   if ((stage === 'panel' || stage === 'row') && menuKey) {
     const item = NAV_BY_KEY.get(menuKey)

@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard'
 import { SidePanel } from './components/SidePanel'
 import { TopBar } from './components/TopBar'
 import { buildView } from './data/dashboard'
+import { MOTION } from './data/motion'
 import { makeInitialState, reducer, type Stage } from './state/machine'
 
 function Hints({ stage }: { stage: Stage }) {
@@ -51,6 +52,21 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [state.seq, state.lockMs])
 
+  /**
+   * 换标签：列表先向左飞出去（durRow），再落快照、从右侧飞回来（又一个 durRow）。
+   * 两条定时器挂在 swapping 上而不是塞进 beats —— beats 一旦换组就会取消
+   * 还没到点的编排（面板入场、看板登场），换标签不该打断它们。
+   */
+  useEffect(() => {
+    if (!state.swapping) return
+    const commit = window.setTimeout(() => dispatch({ type: 'COMMIT_TAB' }), MOTION.durRow)
+    const done = window.setTimeout(() => dispatch({ type: 'END_SWAP' }), MOTION.durRow * 2)
+    return () => {
+      window.clearTimeout(commit)
+      window.clearTimeout(done)
+    }
+  }, [state.swapping])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') dispatch({ type: 'POP' })
@@ -63,6 +79,7 @@ export default function App() {
     <div
       className="stage"
       data-stage={state.stage}
+      data-swap={state.swapping}
       onClick={() => {
         if (state.stage === 'idle') dispatch({ type: 'OPEN_MENU' })
       }}

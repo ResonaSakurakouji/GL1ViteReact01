@@ -52,7 +52,7 @@ export function TopBar({ state, dispatch }: Props) {
       <div className="topbar-inner">
         <div className="tabbar" role="tablist" aria-label="已保存的标签页">
           {state.tabs.length === 0 ? (
-            <span className="tabbar-empty">点左下「＋ 另存」把当前视图存成标签</span>
+            <span className="tabbar-empty">点左下「另存」把当前视图存成标签</span>
           ) : (
             state.tabs.map((tab) => {
               const isActive = tab.id === state.activeTabId
@@ -104,7 +104,7 @@ export function TopBar({ state, dispatch }: Props) {
             onClick={save}
             onKeyDown={onActivateKey(save)}
           >
-            ＋ 另存
+            ↑↑另存
           </span>
 
           <ol className="topbar-crumbs">
