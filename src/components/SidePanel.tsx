@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, Dispatch, KeyboardEvent } from 'react'
-import { NAV_BY_KEY, levelNodes, resolvePath } from '../data/menu.config'
+import { NAV_BY_KEY, levelNodes, listSignature, resolvePath } from '../data/menu.config'
 import type { UiAction, UiState } from '../state/machine'
 
 interface Props {
@@ -30,7 +30,12 @@ export function SidePanel({ state, dispatch }: Props) {
   const items = state.pickedMenu ? levelNodes(state.pickedMenu, state.path) : []
 
   const open = state.chrome
-  const levelKey = `${state.pickedMenu ?? ''}/${state.path.join('.')}`
+  /**
+   * 列表的 key 用**内容指纹**而不是路径。
+   * 这样换标签时如果这一层的选项完全一样，React 会复用同一批 DOM 节点，
+   * 入场动画自然就不会重播 —— 让协调器去做 diff，不用自己数元素。
+   */
+  const levelKey = listSignature(items)
 
   // 当前层级的名称：第一层是主题本身，往下是所在节点
   const levelLabel = chain.length > 0 ? chain[chain.length - 1].label : (menu?.label ?? '')

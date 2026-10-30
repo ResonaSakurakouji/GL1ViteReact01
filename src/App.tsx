@@ -7,7 +7,7 @@ import { SidePanel } from './components/SidePanel'
 import { TopBar } from './components/TopBar'
 import { buildView } from './data/dashboard'
 import { MOTION } from './data/motion'
-import { makeInitialState, reducer, type Stage } from './state/machine'
+import { activeTabOf, makeInitialState, reducer, type Stage } from './state/machine'
 
 function Hints({ stage }: { stage: Stage }) {
   return (
@@ -75,6 +75,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  /**
+   * 高亮标签是**推导**出来的：当前视角等于哪个快照就亮哪个。
+   * 所以导航回一个已经存过的视角，它会自动重新亮起，不需要谁去回填一个 id。
+   */
+  const activeTabId = activeTabOf(state)
+
   return (
     <div
       className="stage"
@@ -87,7 +93,7 @@ export default function App() {
       <Backdrop stage={state.stage} />
       <Dashboard view={view} active={state.board} compact={state.collapsed} />
       <CommandWheel state={state} dispatch={dispatch} />
-      <TopBar state={state} dispatch={dispatch} />
+      <TopBar state={state} dispatch={dispatch} activeTabId={activeTabId} />
       <CmdHeader state={state} dispatch={dispatch} />
       <SidePanel state={state} dispatch={dispatch} />
       <Hints stage={state.stage} />

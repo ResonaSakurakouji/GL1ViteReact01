@@ -225,7 +225,7 @@ check('飞走期间指令盘不可见', q('.wheel')?.dataset.layer === 'false')
 check('飞走期间标题同步淡出', q('.stage')?.dataset.swap === 'true')
 await at(240)
 check('192ms 后换内容', crumbs().join('|') === '按渠道划分', `got "${crumbs().join('|')}"`)
-check('新内容从右侧飞入', q('.panel')?.dataset.phase === 'in', `got ${q('.panel')?.dataset.phase}`)
+check('新内容从左侧滑回', q('.panel')?.dataset.phase === 'in', `got ${q('.panel')?.dataset.phase}`)
 await at(460)
 check('相位已结束', q('.panel')?.dataset.phase === 'idle', `got ${q('.panel')?.dataset.phase}`)
 check('标题淡回', q('.stage')?.dataset.swap === 'false')
@@ -234,6 +234,14 @@ check('恢复层级名', levelName() === '按渠道划分', `got "${levelName()}
 check('恢复列表 6 项', labels().length === 6, `got ${labels().length}`)
 check('看板标题跟随', dashTitle().includes('按渠道划分'), `got "${dashTitle()}"`)
 check('被点的标签高亮', qa('.tab')[0]?.dataset.active === 'true')
+
+// 高亮是推导出来的：离开这个视角高亮会灭，退回来就自动重新亮起
+await click(qa('.panel-row')[0])
+await settle(500)
+check('下钻后高亮熄灭', qa('.tab')[0]?.dataset.active === 'false')
+await click(q('.panel-back'))
+await settle(500)
+check('退回同一视角后自动重新高亮', qa('.tab')[0]?.dataset.active === 'true')
 
 // 同一视角再存一次 → 去重
 await click(q('.tab-save'))
@@ -282,6 +290,32 @@ await act(async () => {
 await settle(120)
 check('全部删除', qa('.tab').length === 0, `got ${qa('.tab').length}`)
 check('回到空态', q('.tabbar-empty') !== null)
+
+console.log('\n=== 11b. 列表内容没变就不播换页动画 ===')
+// 当前视角：按渠道划分 / 经销商直营。先退回第一层，存一个标签
+await click(q('.panel-back'))
+await settle(500)
+check('退回第一层', crumbs().join('|') === '按渠道划分', `got "${crumbs().join('|')}"`)
+await click(q('.tab-save'))
+await settle(150)
+check('存出第一层标签', qa('.tab').length === 1, `got ${qa('.tab').length}`)
+
+// 选一个叶子：列表内容一模一样，只是多了个选中项
+const kaRow = qa('.panel-row').find((r) => r.textContent?.includes('KA'))
+await click(kaRow)
+await settle(300)
+check('叶子已选中', crumbs().join('|') === '按渠道划分|KA 卖场', `got "${crumbs().join('|')}"`)
+await click(q('.tab-save'))
+await settle(150)
+check('存出带叶子的标签', qa('.tab').length === 2, `got ${qa('.tab').length}`)
+
+// 切回第一个标签：两层列表完全一致 → 不该播换页动画
+resetClock()
+await click(qa('.tab')[0])
+check('不进入 out 相位', q('.panel')?.dataset.phase === 'idle', `got ${q('.panel')?.dataset.phase}`)
+check('没有换页相位标记', q('.stage')?.dataset.swap === 'false', `got ${q('.stage')?.dataset.swap}`)
+check('内容即时切换', crumbs().join('|') === '按渠道划分', `got "${crumbs().join('|')}"`)
+check('切回来的标签高亮', qa('.tab')[0]?.dataset.active === 'true')
 
 console.log('\n=== 12. 深链直达深层 + 叶子 ===')
 await act(async () => {

@@ -6,6 +6,8 @@ import type { UiAction, UiState } from '../state/machine'
 interface Props {
   state: UiState
   dispatch: Dispatch<UiAction>
+  /** 由 activeTabOf() 推导出来的高亮标签 —— 当前视角对上哪个标签就是哪个 */
+  activeTabId: string | null
 }
 
 const onActivateKey = (fn: () => void) => (e: KeyboardEvent) => {
@@ -25,7 +27,7 @@ const onActivateKey = (fn: () => void) => (e: KeyboardEvent) => {
  * 标签栏原样恢复（keep-alive）。也正因为这里面有可聚焦元素，隐藏时必须用
  * inert 而不是 aria-hidden。
  */
-export function TopBar({ state, dispatch }: Props) {
+export function TopBar({ state, dispatch, activeTabId }: Props) {
   const active = state.chrome
   const tabIndex = active ? 0 : -1
 
@@ -55,7 +57,7 @@ export function TopBar({ state, dispatch }: Props) {
             <span className="tabbar-empty">点左下「另存」把当前视图存成标签</span>
           ) : (
             state.tabs.map((tab) => {
-              const isActive = tab.id === state.activeTabId
+              const isActive = tab.id === activeTabId
               const open = () => dispatch({ type: 'ACTIVATE_TAB', id: tab.id })
               const close = (e: MouseEvent) => {
                 e.stopPropagation()

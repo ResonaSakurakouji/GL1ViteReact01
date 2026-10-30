@@ -237,6 +237,18 @@ export function levelNodes(menuKey: string | null, path: string[]): NavNode[] {
   return last ? (last.children ?? []) : menu.rows
 }
 
+/**
+ * 一层选项的内容指纹（key + label）。
+ *
+ * 用途有两个：
+ *   ① 换标签时先 diff —— 列表内容一样就不播换页动画；
+ *   ② 作为 .panel-rows 的 key —— React 只在这一层真的变了才重挂 DOM，
+ *      于是"没变化就不重播入场动画"这件事交给 React 的协调器去做。
+ */
+export function listSignature(nodes: NavNode[]): string {
+  return nodes.map((n) => `${n.key}:${n.label}`).join('|')
+}
+
 /** 按钮尺寸常量，和 CSS 里的 .cmd-btn 保持一致 */
 export const BTN_W_VW = 21
 export const LEFT_X_VW = 20

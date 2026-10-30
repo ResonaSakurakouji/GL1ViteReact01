@@ -16,7 +16,8 @@ const server = await createServer({
 })
 
 const { default: App } = await server.ssrLoadModule('/src/App.tsx')
-const { INITIAL, reducer, makeInitialState } = await server.ssrLoadModule('/src/state/machine.ts')
+const { INITIAL, activeTabOf, reducer, makeInitialState } =
+  await server.ssrLoadModule('/src/state/machine.ts')
 const { MAX_DEPTH } = await server.ssrLoadModule('/src/data/menu.config.ts')
 
 const cases = [
@@ -89,14 +90,38 @@ const deepLink = makeInitialState('?stage=row&menu=region&path=sh,pudong&leaf=pu
 console.log('深链         ->', deepLink.stage, 'path', JSON.stringify(deepLink.path), 'leaf', deepLink.leaf)
 console.log('MAX_DEPTH    ->', MAX_DEPTH)
 
-// 标签页：另存 / 去重 / 删除
+// 标签页：另存 / 去重 / 删除 / 高亮推导 / 内容 diff
+const step = (s, a) => {
+  let n = reducer(s, a)
+  for (const b of n.beats) n = reducer(n, { type: 'BEAT', patch: b.patch })
+  return reducer(n, { type: 'SETTLE' })
+}
+
 let ts = makeInitialState('?stage=panel&menu=channel')
 ts = reducer(ts, { type: 'SAVE_TAB' })
 const once = ts.tabs.length
 ts = reducer(ts, { type: 'SAVE_TAB' })
 console.log('SAVE_TAB ×2  ->', ts.tabs.length === once ? '去重 ✓' : '重复 ✗', 'label=' + ts.tabs[0]?.label)
+console.log('高亮自动对上 ->', activeTabOf(ts) === ts.tabs[0]?.id ? '✓' : '✗')
+
+// 只换了叶子：列表内容一样 → 直接落，不播换页动画
+let tv = makeInitialState('?stage=row&menu=channel&path=dealer')
+tv = reducer(tv, { type: 'SAVE_TAB' })
+tv = reducer(tv, { type: 'PICK_ROW', key: 'l1' })
+const sameList = reducer(tv, { type: 'ACTIVATE_TAB', id: tv.tabs[0].id })
+console.log(
+  'same list    ->',
+  !sameList.swapping && sameList.leaf === null ? '跳过动画 ✓' : '仍播动画 ✗',
+  'leaf=' + sameList.leaf,
+)
+
+// 列表内容不同 → 进入 out 相位
+const other = { ...makeInitialState('?stage=panel&menu=region'), tabs: ts.tabs }
+const diffList = reducer(other, { type: 'ACTIVATE_TAB', id: ts.tabs[0].id })
+console.log('diff list    ->', diffList.swapping && diffList.listDir === 'swap' ? 'out 相位 ✓' : '✗')
+
 ts = reducer(ts, { type: 'CLOSE_TAB', id: ts.tabs[0].id })
-console.log('CLOSE_TAB    ->', '剩余', ts.tabs.length, 'active=' + ts.activeTabId)
+console.log('CLOSE_TAB    ->', '剩余', ts.tabs.length, '高亮=' + activeTabOf(ts))
 
 /**
  * app.css 的 :root 里为 IDE 解析保留了一份时长兜底值，
